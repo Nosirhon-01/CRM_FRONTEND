@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Download, Trash2, Eye, MoreVertical, Play, Plus, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { getGroupVideos, deleteVideo, createVideo, updateVideo } from '../services/videos.service';
+import { getGroupVideos, deleteVideo, createVideo, updateVideo, uploadVideo } from '../services/videos.service';
 import { getGroupLessons } from '../services/lessons.service';
+import { BACKEND_BASE_URL } from '../config/api';
 
 const VideosTab = ({ groupId, isDarkMode }) => {
   const [videos, setVideos] = useState([]);
@@ -204,6 +205,16 @@ const VideosTab = ({ groupId, isDarkMode }) => {
           videoUrl: formData.videoUrl || null
         });
         toast.success("Video muvaffaqiyatli yangilandi!", { id: toastId });
+      } else if (formData.file) {
+        // Upload actual video file via multipart/form-data
+        const fd = new FormData();
+        fd.append('file', formData.file);
+        fd.append('lesson_id', formData.lesson_id);
+        fd.append('videoName', formData.videoName);
+        fd.append('lessonName', selectedLesson ? selectedLesson.topic : '');
+        fd.append('status', 'Tayyor');
+        await uploadVideo(groupId, fd);
+        toast.success("Video muvaffaqiyatli yuklandi!", { id: toastId });
       } else {
         await createVideo(groupId, {
           lesson_id: parseInt(formData.lesson_id),
@@ -405,36 +416,7 @@ const VideosTab = ({ groupId, isDarkMode }) => {
         </div>
       )}
 
-      {/* Video Player Modal */}
-      {selectedVideo && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
-          <div className="bg-black rounded-2xl w-full max-w-4xl">
-            <div className="flex items-center justify-between p-4 border-b border-gray-800">
-              <h3 className="text-white font-bold">{selectedVideo.videoName}</h3>
-              <button
-                onClick={() => setSelectedVideo(null)}
-                className="text-gray-400 hover:text-white"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="aspect-video bg-black flex items-center justify-center">
-              {selectedVideo.videoUrl ? (
-                <video
-                  src={selectedVideo.videoUrl}
-                  controls
-                  autoPlay
-                  className="w-full h-full"
-                />
-              ) : (
-                <p className="text-white">Video URL topilmadi</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Video Player Modal (duplicate - removed) */}
 
       {/* Add Video Modal */}
       {modalOpen && (
@@ -604,7 +586,7 @@ const VideosTab = ({ groupId, isDarkMode }) => {
               <div className={`relative aspect-video max-h-[70vh] flex items-center justify-center ${isDarkMode ? 'bg-black' : 'bg-gray-100'}`}>
                  {selectedVideo.videoUrl ? (
                     <video 
-                      src={selectedVideo.videoUrl} 
+                      src={selectedVideo.videoUrl.startsWith('http') ? selectedVideo.videoUrl : `${BACKEND_BASE_URL}${selectedVideo.videoUrl}`}
                       controls 
                       autoPlay
                       className="w-full h-full object-contain"

@@ -63,10 +63,11 @@ export const deleteVideo = async (groupId, videoId) => {
   }
 };
 
+// Upload actual video file (multipart/form-data)
 export const uploadVideo = async (groupId, formData) => {
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/groups/${groupId}/videos`, {
+    const response = await fetch(`${API_URL}/groups/${groupId}/videos/upload`, {
       method: 'POST',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       body: formData
@@ -81,6 +82,7 @@ export const uploadVideo = async (groupId, formData) => {
   }
 };
 
+// Create video record without file (URL only)
 export const createVideo = async (groupId, dto) => {
   try {
     const response = await fetch(`${API_URL}/groups/${groupId}/videos`, {
@@ -98,7 +100,6 @@ export const createVideo = async (groupId, dto) => {
   }
 };
 
-
 export const updateVideo = async (groupId, videoId, dto) => {
   try {
     const response = await fetch(API_URL + '/groups/' + groupId + '/videos/' + videoId, {
@@ -113,4 +114,3 @@ export const updateVideo = async (groupId, videoId, dto) => {
     throw error;
   }
 };
-
