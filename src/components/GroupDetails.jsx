@@ -5,6 +5,7 @@ import * as lessonsService from '../services/lessons.service';
 import * as attendanceService from '../services/attendance.service';
 import * as homeworkService from '../services/homework.service';
 import VideosTab from './VideosTab';
+import ExamsTab from './ExamsTab';
 import { toast } from 'react-hot-toast';
 import { BookOpen, CheckCircle2, ClipboardList, Clock3, GraduationCap, Pencil, Plus, Trash2, Users, Video } from 'lucide-react';
 
@@ -142,6 +143,11 @@ const GroupDetails = ({ isDarkMode }) => {
   const currentRoom = group?.rooms;
   const selectedLesson = findLessonForDate(lessons, selectedDate);
   const selectedLessonHasAttendance = !!selectedLesson?.attendances?.length;
+  const selectedDateIsToday = isSameDay(selectedDate, new Date());
+  const attendanceLocked = selectedLessonHasAttendance || !selectedDateIsToday;
+  const attendanceLockMessage = selectedLessonHasAttendance
+    ? "Bu sana uchun davomat allaqachon saqlangan!"
+    : "Faqat bugungi sana uchun davomat qilish mumkin!";
 
   const mainTabs = [
     { id: 'info', label: "Ma'lumotlar" },
@@ -590,8 +596,8 @@ const GroupDetails = ({ isDarkMode }) => {
                                 <div className="flex items-center gap-4">
                                     <div 
                                         onClick={() => {
-                                            if (selectedLessonHasAttendance) {
-                                                toast.error("Bu sana uchun davomat allaqachon saqlangan!");
+                                            if (attendanceLocked) {
+                                                toast.error(attendanceLockMessage);
                                                 return;
                                             }
                                             setStudentAttendance(prev => ({
@@ -599,7 +605,7 @@ const GroupDetails = ({ isDarkMode }) => {
                                                 [student.id]: !prev?.[student.id]
                                             }));
                                         }}
-                                        className={`relative inline-flex items-center transition-all duration-300 w-11 h-6 rounded-full border ${selectedLessonHasAttendance ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${isPresent ? 'bg-[#10b981] border-[#10b981]' : 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600'}`}
+                                        className={`relative inline-flex items-center transition-all duration-300 w-11 h-6 rounded-full border ${attendanceLocked ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${isPresent ? 'bg-[#10b981] border-[#10b981]' : 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600'}`}
                                     >
                                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${isPresent ? 'translate-x-6' : 'translate-x-1'}`}></div>
                                     </div>
@@ -619,13 +625,13 @@ const GroupDetails = ({ isDarkMode }) => {
                             placeholder="Mavzu"
                             value={topic}
                             onChange={(e) => setTopic(e.target.value)}
-                            disabled={savingAttendance || selectedLessonHasAttendance}
+                            disabled={savingAttendance || attendanceLocked}
                             className={`flex-1 px-5 py-3 rounded-2xl border outline-none text-[14px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-70 ${isDarkMode ? 'bg-[#1e293b] border-gray-700' : 'bg-gray-50 border-gray-100 focus:border-[#6366f1]'}`}
                         />
                         <button
                             onClick={async () => {
-                                if (selectedLessonHasAttendance) {
-                                    toast.error("Bu sana uchun davomat allaqachon saqlangan!");
+                                if (attendanceLocked) {
+                                    toast.error(attendanceLockMessage);
                                     return;
                                 }
                                 if (!topic) {
@@ -638,7 +644,7 @@ const GroupDetails = ({ isDarkMode }) => {
                                     const lessonPayload = {
                                         group_id: +id,
                                         topic: topic,
-                                        lesson_date: selectedDate.toISOString(),
+                                        lesson_date: new Date().toISOString(),
                                         description: ""
                                     };
                                     const lessonRes = selectedLesson
@@ -667,10 +673,10 @@ const GroupDetails = ({ isDarkMode }) => {
                                     setSavingAttendance(false);
                                 }
                             }}
-                            disabled={savingAttendance || selectedLessonHasAttendance}
+                            disabled={savingAttendance || attendanceLocked}
                             className="px-8 py-3 bg-[#6366f1] text-white rounded-2xl font-black shadow-lg shadow-indigo-500/20 hover:bg-[#4f46e5] text-[15px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {savingAttendance ? 'Saqlanmoqda...' : selectedLessonHasAttendance ? 'Saqlangan' : 'Saqlash'}
+                            {savingAttendance ? 'Saqlanmoqda...' : selectedLessonHasAttendance ? 'Saqlangan' : !selectedDateIsToday ? 'Faqat bugun' : 'Saqlash'}
                         </button>
                      </div>
                 </div>
@@ -703,7 +709,7 @@ const GroupDetails = ({ isDarkMode }) => {
                 })}
               </div>
             </div>
-            {activeLessonTab !== 'videos' && (
+            {activeLessonTab !== 'videos' && activeLessonTab !== 'exams' && (
               <button
                 type="button"
                 onClick={openHomeworkModal}
@@ -717,6 +723,12 @@ const GroupDetails = ({ isDarkMode }) => {
 
           {activeLessonTab === 'videos' ? (
             <VideosTab groupId={id} isDarkMode={isDarkMode} />
+          ) : activeLessonTab === 'exams' ? (
+            <ExamsTab 
+               groupId={id} 
+               isDarkMode={isDarkMode} 
+               groupStudentsCount={group.students?.length || 0} 
+            />
           ) : canShowLessonTable ? (
             tableRows.length ? (
               <div className={`overflow-x-auto rounded-xl border ${isDarkMode ? 'border-gray-800 bg-[#1e293b]' : 'border-gray-100 bg-white shadow-sm'}`}>

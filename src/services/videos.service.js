@@ -82,6 +82,35 @@ export const uploadVideo = async (groupId, formData) => {
   }
 };
 
+// Upload with progress tracking via XMLHttpRequest
+export const uploadVideoWithProgress = (groupId, formData, onProgress) => {
+  return new Promise((resolve, reject) => {
+    const token = localStorage.getItem('token');
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_URL}/groups/${groupId}/videos/upload`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      try {
+        const json = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) resolve(json);
+        else reject(new Error(json.message || 'Upload failed'));
+      } catch {
+        reject(new Error('Invalid server response'));
+      }
+    });
+
+    xhr.addEventListener('error', () => reject(new Error('Network error')));
+    xhr.send(formData);
+  });
+};
+
 // Create video record without file (URL only)
 export const createVideo = async (groupId, dto) => {
   try {

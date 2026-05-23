@@ -54,6 +54,35 @@ export const deleteGroup = async (id) => {
   }
 };
 
+export const getArchivedGroups = async () => {
+  try {
+    const response = await fetch(`${API_URL}/groups/archive/all`, {
+      method: 'GET',
+      headers: getHeaders()
+    });
+    if (!response.ok) throw new Error(`Error: ${response.status} ${response.statusText}`);
+    const json = await response.json();
+    return json.data || [];
+  } catch (error) {
+    console.error('Failed to fetch archived groups:', error);
+    throw error;
+  }
+};
+
+export const restoreGroup = async (id) => {
+  try {
+    const response = await fetch(`${API_URL}/groups/${id}/restore`, {
+      method: 'PATCH',
+      headers: getHeaders()
+    });
+    if (!response.ok) throw new Error(`Error: ${response.status} ${response.statusText}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to restore group:', error);
+    throw error;
+  }
+};
+
 export const assignTeacherToGroup = async (groupId, teacherId) => {
   try {
     const response = await fetch(`${API_URL}/groups/${groupId}/assign-teacher`, {
@@ -114,8 +143,10 @@ export const getGroupById = async (id) => {
 
 export default {
   getGroups,
+  getArchivedGroups,
   createGroup,
   deleteGroup,
+  restoreGroup,
   updateGroup,
   getGroupById,
   assignTeacherToGroup,

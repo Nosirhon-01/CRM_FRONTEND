@@ -7,6 +7,7 @@ const Students = ({ isDarkMode }) => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [totalCount, setTotalCount] = useState(0);
 
@@ -129,6 +130,26 @@ const Students = ({ isDarkMode }) => {
     setShowSidebar(true);
   };
 
+  const normalizeSearch = (value) => String(value || '').toLowerCase().trim();
+  const searchValue = normalizeSearch(searchTerm);
+  const filteredStudents = searchValue
+    ? students.filter(student => {
+        const groupNames = Array.isArray(student.groups)
+          ? student.groups.map(group => group?.name).join(' ')
+          : '';
+        const searchableText = [
+          student.first_name,
+          student.last_name,
+          `${student.first_name || ''} ${student.last_name || ''}`,
+          student.phone,
+          student.email,
+          groupNames
+        ].map(normalizeSearch).join(' ');
+
+        return searchableText.includes(searchValue);
+      })
+    : students;
+
   // const totalPages = Math.ceil(totalCount / 10) || 1; // itemsPerPage was undefined
 
   return (
@@ -165,7 +186,13 @@ const Students = ({ isDarkMode }) => {
           <div className="flex items-center gap-4">
             <div className={`flex items-center px-4 py-2 rounded-xl border ${isDarkMode ? 'bg-[#0f172a] border-gray-700' : 'bg-white border-gray-200'}`}>
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              <input type="text" placeholder="Search" className={`ml-2 outline-none bg-transparent text-[13px] w-48 ${isDarkMode ? 'text-white' : 'text-gray-700'}`} />
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`ml-2 outline-none bg-transparent text-[13px] w-48 ${isDarkMode ? 'text-white' : 'text-gray-700'}`}
+              />
             </div>
           </div>
         </div>
@@ -187,10 +214,10 @@ const Students = ({ isDarkMode }) => {
             <tbody className="text-[13px]">
               {loading ? (
                 <tr><td colSpan="8" className="py-10 text-center text-gray-400">Yuklanmoqda...</td></tr>
-              ) : students.length === 0 ? (
-                <tr><td colSpan="8" className="py-10 text-center text-gray-400">Talabalar topilmadi</td></tr>
+              ) : filteredStudents.length === 0 ? (
+                <tr><td colSpan="8" className="py-10 text-center text-gray-400">{searchTerm ? 'Qidiruv bo\'yicha talaba topilmadi' : 'Talabalar topilmadi'}</td></tr>
               ) : (
-                students.map(s => (
+                filteredStudents.map(s => (
                   <tr key={s.id} className={`border-b last:border-b-0 hover:bg-gray-50/50 dark:hover:bg-[#334155]/20 transition-colors ${isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-100 text-[#1e2a4a]'}`}>
                     <td className="py-4 pl-2"><input type="checkbox" className="rounded" /></td>
                     <td className="py-4 px-4">

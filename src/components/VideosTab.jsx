@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Download, Trash2, Eye, MoreVertical, Play, Plus, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { getGroupVideos, deleteVideo, createVideo, updateVideo, uploadVideo } from '../services/videos.service';
+import { getGroupVideos, deleteVideo, createVideo, updateVideo, uploadVideoWithProgress } from '../services/videos.service';
 import { getGroupLessons } from '../services/lessons.service';
 import { BACKEND_BASE_URL } from '../config/api';
 
@@ -26,6 +26,7 @@ const VideosTab = ({ groupId, isDarkMode }) => {
   const [videoToDelete, setVideoToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [editingVideoId, setEditingVideoId] = useState(null);
+  const [uploadingItem, setUploadingItem] = useState(null); // { videoName, lessonName, progress }
 
   useEffect(() => {
     fetchVideos();
@@ -192,11 +193,11 @@ const VideosTab = ({ groupId, isDarkMode }) => {
       return;
     }
     setAddingVideo(true);
-    const toastId = toast.loading(editingVideoId ? "Video yangilanmoqda..." : "Video saqlanmoqda...");
     try {
       const selectedLesson = lessons.find(l => l.id === parseInt(formData.lesson_id));
       
       if (editingVideoId) {
+        const toastId = toast.loading("Video yangilanmoqda...");
         await updateVideo(groupId, editingVideoId, {
           lesson_id: parseInt(formData.lesson_id),
           videoName: formData.videoName,
@@ -206,22 +207,39 @@ const VideosTab = ({ groupId, isDarkMode }) => {
         });
         toast.success("Video muvaffaqiyatli yangilandi!", { id: toastId });
       } else if (formData.file) {
-        // Upload actual video file via multipart/form-data
+        // Show uploading row in table with progress
+        setUploadingItem({
+          videoName: formData.videoName,
+          lessonName: selectedLesson ? selectedLesson.topic : '',
+          progress: 0
+        });
+        setModalOpen(false);
+        setFormData({ lesson_id: '', videoName: '', videoUrl: '' });
+
         const fd = new FormData();
         fd.append('file', formData.file);
         fd.append('lesson_id', formData.lesson_id);
         fd.append('videoName', formData.videoName);
         fd.append('lessonName', selectedLesson ? selectedLesson.topic : '');
         fd.append('status', 'Tayyor');
-        await uploadVideo(groupId, fd);
-        toast.success("Video muvaffaqiyatli yuklandi!", { id: toastId });
+
+        await uploadVideoWithProgress(groupId, fd, (pct) => {
+          setUploadingItem(prev => prev ? { ...prev, progress: pct } : null);
+        });
+
+        setUploadingItem(null);
+        toast.success("Video muvaffaqiyatli yuklandi!");
+        fetchVideos();
+        setEditingVideoId(null);
+        setAddingVideo(false);
+        return;
       } else {
+        const toastId = toast.loading("Video saqlanmoqda...");
         await createVideo(groupId, {
           lesson_id: parseInt(formData.lesson_id),
           videoName: formData.videoName,
           lessonName: selectedLesson ? selectedLesson.topic : '',
           status: 'Tayyor',
-          size: Math.floor(Math.random() * (1024 * 1024 * 1024 * 2)),
           videoUrl: formData.videoUrl || null
         });
         toast.success("Video muvaffaqiyatli saqlandi!", { id: toastId });
@@ -231,7 +249,8 @@ const VideosTab = ({ groupId, isDarkMode }) => {
       setEditingVideoId(null);
       fetchVideos();
     } catch (err) {
-      toast.error(editingVideoId ? "Videoni yangilashda xatolik" : "Videoni qo'shishda xatolik", { id: toastId });
+      setUploadingItem(null);
+      toast.error(editingVideoId ? "Videoni yangilashda xatolik" : "Videoni qo'shishda xatolik");
     } finally {
       setAddingVideo(false);
     }
@@ -284,7 +303,7 @@ const VideosTab = ({ groupId, isDarkMode }) => {
       </div>
 
       {/* Videos Table */}
-      {filteredVideos.length > 0 ? (
+      {(filteredVideos.length > 0 || uploadingItem) ? (
         <div className={`rounded-2xl border overflow-x-auto ${isDarkMode ? 'bg-[#1e293b] border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
           <table className="w-full min-w-max">
             <thead>
@@ -299,6 +318,45 @@ const VideosTab = ({ groupId, isDarkMode }) => {
               </tr>
             </thead>
             <tbody>
+              {/* Uploading progress row */}
+              {uploadingItem && (
+                <tr className={`border-b text-[14px] font-medium ${
+                  isDarkMode ? 'border-gray-800 bg-blue-900/10' : 'border-gray-100 bg-blue-50/60'
+                }`}>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center gap-3 max-w-xs">
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                        <svg className="w-5 h-5 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                        </svg>
+                      </div>
+                      <p className="font-bold truncate">{uploadingItem.videoName}</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-sm">
+                    <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{uploadingItem.lessonName || '-'}</span>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-col items-center gap-1 min-w-[120px]">
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-xs font-bold text-blue-500">Yuklanmoqda</span>
+                        <span className="text-xs font-bold text-blue-500">{uploadingItem.progress}%</span>
+                      </div>
+                      <div className={`w-full h-2 rounded-full overflow-hidden ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                        <div
+                          className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadingItem.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-center text-sm"><span className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>—</span></td>
+                  <td className="px-4 py-4 text-center text-sm"><span className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>—</span></td>
+                  <td className="px-4 py-4 text-center text-sm"><span className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>—</span></td>
+                  <td className="px-4 py-4 text-center"><span className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>—</span></td>
+                </tr>
+              )}
               {filteredVideos.map((video, idx) => (
                 <tr 
                   key={video.id} 

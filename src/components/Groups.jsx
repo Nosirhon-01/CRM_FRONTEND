@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getGroups, createGroup, deleteGroup, toggleGroupStatus, updateGroup } from '../services/groups.service';
+import { getGroups, getArchivedGroups, createGroup, deleteGroup, restoreGroup, toggleGroupStatus, updateGroup } from '../services/groups.service';
 import { toast } from 'react-hot-toast';
 import * as teachersService from '../services/teachers.service';
 import * as coursesService from '../services/courses.service';
@@ -25,6 +25,7 @@ const WEEK_DAYS = [
 const Groups = ({ isDarkMode }) => {
   const navigate = useNavigate();
   const [groups, setGroups]     = useState([]);
+  const [archivedGroups, setArchivedGroups] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [teachers, setTeachers] = useState([]);
   const [courses, setCourses]   = useState([]);
@@ -44,11 +45,13 @@ const Groups = ({ isDarkMode }) => {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [teacherSearch, setTeacherSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
+  const [activeView, setActiveView] = useState('groups');
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { setCurrentPage(1); }, [activeView]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -60,6 +63,14 @@ const Groups = ({ isDarkMode }) => {
       } catch (err) {
         console.error('Failed to fetch groups:', err);
         setGroups([]);
+      }
+
+      try {
+        const archivedData = await getArchivedGroups();
+        setArchivedGroups(archivedData || []);
+      } catch (err) {
+        console.error('Failed to fetch archived groups:', err);
+        setArchivedGroups([]);
       }
 
       // Fetch teachers
@@ -153,14 +164,27 @@ const Groups = ({ isDarkMode }) => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Guruhni o'chirmoqchimisiz?")) return;
+    if (!window.confirm("Guruhni arxivga o'tkazmoqchimisiz?")) return;
+    const toastId = toast.loading("Arxivga o'tkazilmoqda...");
     try {
-      const res = await fetch(`${API_URL}/groups/${id}/deactivate`, { method: 'PATCH', headers: getHeaders() });
-      if (!res.ok) throw new Error();
-      toast.success("Guruh muvaffaqiyatli o'chirildi");
-      setGroups(prev => prev.map(g => g.id === id ? { ...g, status: 'inactive' } : g));
+      const res = await deleteGroup(id);
+      if (!res.success) throw new Error(res.message);
+      toast.success("Guruh arxivga o'tkazildi", { id: toastId });
+      await fetchAll();
     } catch {
-      toast.error("O'chirishda xatolik yuz berdi");
+      toast.error("Arxivga o'tkazishda xatolik yuz berdi", { id: toastId });
+    }
+  };
+
+  const handleRestore = async (id) => {
+    const toastId = toast.loading("Guruh qaytarilmoqda...");
+    try {
+      const res = await restoreGroup(id);
+      if (!res.success) throw new Error(res.message);
+      toast.success("Guruh arxivdan qaytarildi", { id: toastId });
+      await fetchAll();
+    } catch {
+      toast.error("Guruhni qaytarishda xatolik yuz berdi", { id: toastId });
     }
   };
 
@@ -206,16 +230,18 @@ const Groups = ({ isDarkMode }) => {
     setShowSidebar(true);
   };
 
+  const visibleGroups = activeView === 'archive' ? archivedGroups : groups;
+
   // stats
-  const totalGroups   = groups.length;
-  const totalTeachers = [...new Set(groups.map(g => g.teachers?.id).filter(Boolean))].length;
-  const totalStudents = groups.reduce((acc, g) => acc + (g.max_student || 0), 0);
+  const totalGroups   = visibleGroups.length;
+  const totalTeachers = [...new Set(visibleGroups.map(g => g.teachers?.id).filter(Boolean))].length;
+  const totalStudents = visibleGroups.reduce((acc, g) => acc + (g.max_student || 0), 0);
 
   // pagination
-  const totalPages      = Math.ceil(groups.length / itemsPerPage);
+  const totalPages      = Math.ceil(visibleGroups.length / itemsPerPage);
   const indexOfLast     = currentPage * itemsPerPage;
   const indexOfFirst    = indexOfLast - itemsPerPage;
-  const currentItems    = groups.slice(indexOfFirst, indexOfLast);
+  const currentItems    = visibleGroups.slice(indexOfFirst, indexOfLast);
 
   const weekDayLabel = (arr) => {
     if (!Array.isArray(arr) || arr.length === 0) return '-';
@@ -245,17 +271,41 @@ const Groups = ({ isDarkMode }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className={`text-3xl font-bold ${txt}`}>Guruhlar</h2>
-        <button
-          onClick={() => setShowSidebar(true)}
-          className="px-4 py-2 bg-[#6366f1] text-white rounded-xl text-[14px] font-bold shadow-md hover:bg-[#4f46e5] flex items-center gap-2 transition-all"
-        >
-          <span>+</span> Guruh qo'shish
-        </button>
+        {activeView === 'groups' && (
+          <button
+            onClick={() => setShowSidebar(true)}
+            className="px-4 py-2 bg-[#6366f1] text-white rounded-xl text-[14px] font-bold shadow-md hover:bg-[#4f46e5] flex items-center gap-2 transition-all"
+          >
+            <span>+</span> Guruh qo'shish
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
       <div className="flex items-center gap-4 border-b dark:border-gray-700 border-gray-200">
-        <button className="pb-2 text-[14px] font-semibold border-b-2 border-indigo-600 text-indigo-600">Guruhlar</button>
+        {[
+          { id: 'groups', label: 'Guruhlar', count: groups.length },
+          { id: 'archive', label: 'Arxiv', count: archivedGroups.length },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveView(tab.id)}
+            className={`pb-2 text-[14px] font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+              activeView === tab.id
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-400 hover:text-indigo-500'
+            }`}
+          >
+            {tab.label}
+            <span className={`px-1.5 py-0.5 rounded-md text-[11px] ${
+              activeView === tab.id
+                ? 'bg-indigo-50 text-indigo-600'
+                : isDarkMode ? 'bg-[#0f172a] text-gray-400' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {tab.count}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Stats */}
@@ -294,32 +344,40 @@ const Groups = ({ isDarkMode }) => {
               {loading ? (
                 <tr><td colSpan="10" className="py-10 text-center text-gray-400">Yuklanmoqda...</td></tr>
               ) : currentItems.length === 0 ? (
-                <tr><td colSpan="10" className="py-10 text-center text-gray-400">Guruhlar topilmadi</td></tr>
+                <tr><td colSpan="10" className="py-10 text-center text-gray-400">{activeView === 'archive' ? 'Arxivda guruhlar topilmadi' : 'Guruhlar topilmadi'}</td></tr>
               ) : (
-                currentItems.map(group => (
+                currentItems.map(group => {
+                  const isArchiveView = activeView === 'archive';
+                  return (
                   <tr 
                     key={group.id} 
                     onClick={() => {
-                      navigate(`/dashboard/groups/${group.id}`);
+                      if (!isArchiveView) navigate(`/dashboard/groups/${group.id}`);
                     }}
-                    className={`border-b last:border-b-0 transition-all cursor-pointer ${isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-[#334155]/20' : 'border-gray-100 text-[#1e2a4a] hover:bg-gray-50/50'}`}
+                    className={`border-b last:border-b-0 transition-all ${isArchiveView ? 'cursor-default' : 'cursor-pointer'} ${isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-[#334155]/20' : 'border-gray-100 text-[#1e2a4a] hover:bg-gray-50/50'}`}
                   >
                     {/* Status toggle */}
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleStatus(group.id);
-                          }}
-                          className={`relative inline-flex items-center cursor-pointer transition-all duration-300 w-9 h-5 rounded-full ${group.status === 'active' ? 'bg-indigo-500' : 'bg-gray-300'}`}
-                        >
-                          <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ${group.status === 'active' ? 'translate-x-4.5 left-0' : 'translate-x-0.5 left-0'}`}></div>
-                        </div>
-                        <span className={`text-[11px] font-bold uppercase transition-colors duration-300 ${group.status === 'active' ? 'text-indigo-500' : 'text-gray-400'}`}>
-                          {group.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
+                      {isArchiveView ? (
+                        <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold uppercase text-amber-600">
+                          ARXIV
                         </span>
-                      </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleStatus(group.id);
+                            }}
+                            className={`relative inline-flex items-center cursor-pointer transition-all duration-300 w-9 h-5 rounded-full ${group.status === 'active' ? 'bg-indigo-500' : 'bg-gray-300'}`}
+                          >
+                            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ${group.status === 'active' ? 'translate-x-4.5 left-0' : 'translate-x-0.5 left-0'}`}></div>
+                          </div>
+                          <span className={`text-[11px] font-bold uppercase transition-colors duration-300 ${group.status === 'active' ? 'text-indigo-500' : 'text-gray-400'}`}>
+                            {group.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     {/* Name */}
                     <td className="py-3 px-4 font-semibold whitespace-nowrap">{group.name}</td>
@@ -362,28 +420,44 @@ const Groups = ({ isDarkMode }) => {
                     {/* Actions */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleEditClick(group)}
-                          className="p-1 text-gray-300 hover:text-indigo-500 transition-colors"
-                          title="Tahrirlash"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(group.id)}
-                          className="p-1 text-gray-300 hover:text-red-500 transition-colors"
-                          title="O'chirish"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                          </svg>
-                        </button>
+                        {isArchiveView ? (
+                          <button
+                            onClick={() => handleRestore(group.id)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 px-2.5 py-1.5 text-[12px] font-bold text-indigo-600 hover:bg-indigo-50 transition-colors"
+                            title="Qaytarish"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a4 4 0 010 8H7m-4-8l4-4m-4 4l4 4"/>
+                            </svg>
+                            Qaytarish
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleEditClick(group)}
+                              className="p-1 text-gray-300 hover:text-indigo-500 transition-colors"
+                              title="Tahrirlash"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleDelete(group.id)}
+                              className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                              title="Arxivga o'tkazish"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                              </svg>
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

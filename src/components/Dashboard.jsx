@@ -19,6 +19,9 @@ import GroupDetails from './GroupDetails';
 import HomeworkDetail from './HomeworkDetail';
 import HomeworkSubmissions from './HomeworkSubmissions';
 import HomeworkVerification from './HomeworkVerification';
+import CreateExamPage from './CreateExamPage';
+import ExamDetailsPage from './ExamDetailsPage';
+import ExamReviewPage from './ExamReviewPage';
 
 const SidebarIcon = ({ name }) => {
   switch (name) {
@@ -302,6 +305,9 @@ const Dashboard = ({ onLogout, userEmail }) => {
             <Route path="students" element={<Students isDarkMode={isDarkMode} />} />
             <Route path="groups" element={<Groups isDarkMode={isDarkMode} />} />
             <Route path="groups/:id" element={<GroupDetails isDarkMode={isDarkMode} />} />
+            <Route path="groups/:groupId/exams/create" element={<CreateExamPage isDarkMode={isDarkMode} />} />
+            <Route path="groups/:groupId/exams/:examId/check/:studentId" element={<ExamReviewPage isDarkMode={isDarkMode} />} />
+            <Route path="groups/:groupId/exams/:examId" element={<ExamDetailsPage isDarkMode={isDarkMode} />} />
             <Route path="homework/:homeworkId" element={<HomeworkDetail isDarkMode={isDarkMode} />} />
             <Route path="homework/:homeworkId/submissions" element={<HomeworkSubmissions isDarkMode={isDarkMode} />} />
             <Route path="homework/:homeworkId/verify/:answerId" element={<HomeworkVerification isDarkMode={isDarkMode} />} />
