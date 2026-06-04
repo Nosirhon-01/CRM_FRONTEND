@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import roomsService from '../services/rooms.service';
-import axios from 'axios';
 
 const Rooms = ({ isDarkMode }) => {
   const [rooms, setRooms] = useState([]);
@@ -11,9 +10,8 @@ const Rooms = ({ isDarkMode }) => {
   const [newRoom, setNewRoom] = useState({ name: '', capacity: '' });
   const [editingRoom, setEditingRoom] = useState(null);
 
-  const getHeaders = () => ({
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-  });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState(null);
 
   const fetchRooms = async () => {
     try {
@@ -36,10 +34,10 @@ const Rooms = ({ isDarkMode }) => {
     if (!newRoom.name || !newRoom.capacity) return;
     try {
       if (editingRoom) {
-        await axios.patch(`http://localhost:3000/api/v1/rooms/${editingRoom.id}`, {
+        await roomsService.updateRoom(editingRoom.id, {
           name: newRoom.name,
           capacity: parseInt(newRoom.capacity)
-        }, getHeaders());
+        });
         setEditingRoom(null);
       } else {
         await roomsService.createRoom({
@@ -55,13 +53,26 @@ const Rooms = ({ isDarkMode }) => {
     }
   };
 
-  const handleDeleteRoom = async (id) => {
+  const handleDeleteRoom = (id) => {
+    setRoomToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!roomToDelete) return;
     try {
-      await roomsService.deleteRoom(id);
+      await roomsService.deleteRoom(roomToDelete);
       await fetchRooms();
+      setShowDeleteModal(false);
+      setRoomToDelete(null);
     } catch (error) {
       console.error('Error deleting room:', error);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setRoomToDelete(null);
   };
 
   const openEditSidebar = (room) => {
@@ -138,6 +149,31 @@ const Rooms = ({ isDarkMode }) => {
         </div>
       </div>
       {showAddSidebar && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={closeSidebar} />}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className={`w-full max-w-sm p-6 rounded-2xl shadow-xl ${isDarkMode ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <h3 className={`text-lg font-bold text-center mb-4 ${isDarkMode ? 'text-white' : 'text-[#1e2a4a]'}`}>
+              Siz xonani o'chirishga aminmisiz?
+            </h3>
+            <div className="flex justify-center gap-4 mt-6">
+              <button 
+                onClick={cancelDelete} 
+                className={`px-5 py-2.5 rounded-xl font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              >
+                Yo'q
+              </button>
+              <button 
+                onClick={confirmDelete} 
+                className="px-5 py-2.5 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-colors"
+              >
+                Ha, o'chirish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

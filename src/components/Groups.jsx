@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getGroups, getArchivedGroups, createGroup, deleteGroup, restoreGroup, toggleGroupStatus, updateGroup } from '../services/groups.service';
+import { getGroups, getMyGroups, getArchivedGroups, createGroup, deleteGroup, restoreGroup, toggleGroupStatus, updateGroup } from '../services/groups.service';
 import { toast } from 'react-hot-toast';
 import * as teachersService from '../services/teachers.service';
 import * as coursesService from '../services/courses.service';
@@ -22,7 +22,7 @@ const WEEK_DAYS = [
   { value: 'SUNDAY',    label: 'Yak' },
 ];
 
-const Groups = ({ isDarkMode }) => {
+const Groups = ({ isDarkMode, isTeacher = false }) => {
   const navigate = useNavigate();
   const [groups, setGroups]     = useState([]);
   const [archivedGroups, setArchivedGroups] = useState([]);
@@ -35,7 +35,7 @@ const Groups = ({ isDarkMode }) => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState(null);
   const [form, setForm] = useState({
-    name: '', course_id: '', teacher_id: '', room_id: '',
+    name: '', course_id: '', teacher_ids: [], room_id: '',
     start_date: '', start_time: '', max_student: '', week_day: [],
     student_ids: []
   });
@@ -58,7 +58,7 @@ const Groups = ({ isDarkMode }) => {
     try {
       // Fetch groups
       try {
-        const gData = await getGroups();
+        const gData = await (isTeacher ? getMyGroups() : getGroups());
         setGroups(gData || []);
       } catch (err) {
         console.error('Failed to fetch groups:', err);
@@ -115,7 +115,7 @@ const Groups = ({ isDarkMode }) => {
     setShowSidebar(false);
     setEditingGroupId(null);
     setSaveError('');
-    setForm({ name: '', course_id: '', teacher_id: '', room_id: '', start_date: '', start_time: '', max_student: '', week_day: [], student_ids: [] });
+    setForm({ name: '', course_id: '', teacher_ids: [], room_id: '', start_date: '', start_time: '', max_student: '', week_day: [], student_ids: [] });
   };
 
   const toggleWeekDay = (day) => {
@@ -126,7 +126,7 @@ const Groups = ({ isDarkMode }) => {
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.course_id || !form.teacher_id || !form.room_id || !form.start_date || !form.start_time || !form.max_student) {
+    if (!form.name || !form.course_id || !form.teacher_ids || form.teacher_ids.length === 0 || !form.room_id || !form.start_date || !form.start_time || !form.max_student) {
       toast.error("Barcha majburiy maydonlarni to'ldiring!");
       return;
     }
@@ -135,7 +135,7 @@ const Groups = ({ isDarkMode }) => {
       const payload = {
         name: form.name,
         course_id: +form.course_id,
-        teacher_id: +form.teacher_id,
+        teacher_ids: form.teacher_ids.map(id => +id),
         room_id: +form.room_id,
         start_date: form.start_date,
         start_time: form.start_time,
@@ -205,7 +205,7 @@ const Groups = ({ isDarkMode }) => {
     setForm({
       name: group.name || '',
       course_id: group.courses?.id || '',
-      teacher_id: group.teachers?.id || '',
+      teacher_ids: group.teachers?.map(t => t.id) || [],
       room_id: group.rooms?.id || '',
       start_date: group.start_date ? new Date(group.start_date).toISOString().split('T')[0] : '',
       start_time: group.start_time || '',
@@ -234,7 +234,7 @@ const Groups = ({ isDarkMode }) => {
 
   // stats
   const totalGroups   = visibleGroups.length;
-  const totalTeachers = [...new Set(visibleGroups.map(g => g.teachers?.id).filter(Boolean))].length;
+  const totalTeachers = [...new Set(visibleGroups.flatMap(g => g.teachers?.map(t => t.id)).filter(Boolean))].length;
   const totalStudents = visibleGroups.reduce((acc, g) => acc + (g.max_student || 0), 0);
 
   // pagination
@@ -271,7 +271,7 @@ const Groups = ({ isDarkMode }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className={`text-3xl font-bold ${txt}`}>Guruhlar</h2>
-        {activeView === 'groups' && (
+        {activeView === 'groups' && !isTeacher && (
           <button
             onClick={() => setShowSidebar(true)}
             className="px-4 py-2 bg-[#6366f1] text-white rounded-xl text-[14px] font-bold shadow-md hover:bg-[#4f46e5] flex items-center gap-2 transition-all"
@@ -285,8 +285,8 @@ const Groups = ({ isDarkMode }) => {
       <div className="flex items-center gap-4 border-b dark:border-gray-700 border-gray-200">
         {[
           { id: 'groups', label: 'Guruhlar', count: groups.length },
-          { id: 'archive', label: 'Arxiv', count: archivedGroups.length },
-        ].map(tab => (
+          !isTeacher && { id: 'archive', label: 'Arxiv', count: archivedGroups.length },
+        ].filter(Boolean).map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveView(tab.id)}
@@ -337,7 +337,7 @@ const Groups = ({ isDarkMode }) => {
                 <th className="py-3 px-4">Xona</th>
                 <th className="py-3 px-4">O'qituvchi</th>
                 <th className="py-3 px-4">Talabalar</th>
-                <th className="py-3 px-4"></th>
+                {!isTeacher && <th className="py-3 px-4"></th>}
               </tr>
             </thead>
             <tbody className="text-[13px]">
@@ -364,15 +364,22 @@ const Groups = ({ isDarkMode }) => {
                         </span>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <div 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleStatus(group.id);
-                            }}
-                            className={`relative inline-flex items-center cursor-pointer transition-all duration-300 w-9 h-5 rounded-full ${group.status === 'active' ? 'bg-indigo-500' : 'bg-gray-300'}`}
-                          >
-                            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ${group.status === 'active' ? 'translate-x-4.5 left-0' : 'translate-x-0.5 left-0'}`}></div>
-                          </div>
+                          {!isTeacher && (
+                            <div 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleStatus(group.id);
+                              }}
+                              className={`relative inline-flex items-center cursor-pointer transition-all duration-300 w-9 h-5 rounded-full ${group.status === 'active' ? 'bg-indigo-500' : 'bg-gray-300'}`}
+                            >
+                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ${group.status === 'active' ? 'translate-x-4.5 left-0' : 'translate-x-0.5 left-0'}`}></div>
+                            </div>
+                          )}
+                          {isTeacher && (
+                            <div className={`relative inline-flex items-center w-9 h-5 rounded-full ${group.status === 'active' ? 'bg-indigo-500' : 'bg-gray-300'}`}>
+                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transform ${group.status === 'active' ? 'translate-x-4.5 left-0' : 'translate-x-0.5 left-0'}`}></div>
+                            </div>
+                          )}
                           <span className={`text-[11px] font-bold uppercase transition-colors duration-300 ${group.status === 'active' ? 'text-indigo-500' : 'text-gray-400'}`}>
                             {group.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
                           </span>
@@ -404,57 +411,71 @@ const Groups = ({ isDarkMode }) => {
                     <td className="py-3 px-4 whitespace-nowrap">{group.rooms?.name || '-'}</td>
                     {/* O'qituvchi */}
                     <td className="py-3 px-4 whitespace-nowrap">
-                      {group.teachers?.first_name ? (
-                        <span className="flex items-center gap-1">
-                          <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                            {group.teachers.first_name[0]}
-                          </span>
-                          {group.teachers.first_name}
-                        </span>
+                      {group.teachers && group.teachers.length > 0 ? (
+                        <div className="flex -space-x-2">
+                          {group.teachers.slice(0, 3).map((t, i) => (
+                            <span 
+                              key={t.id} 
+                              className={`w-6 h-6 rounded-full bg-indigo-100 border-2 ${isDarkMode ? 'border-[#1e293b]' : 'border-white'} text-indigo-600 flex items-center justify-center text-[10px] font-bold flex-shrink-0 relative z-[${10-i}]`}
+                              title={`${t.first_name} ${t.last_name || ''}`}
+                            >
+                              {t.photo ? (
+                                <img src={`http://localhost:3000/files/${t.photo}`} className="w-full h-full object-cover rounded-full" alt="" />
+                              ) : t.first_name[0]}
+                            </span>
+                          ))}
+                          {group.teachers.length > 3 && (
+                             <span className={`w-6 h-6 rounded-full bg-gray-100 border-2 ${isDarkMode ? 'border-[#1e293b]' : 'border-white'} text-gray-600 flex items-center justify-center text-[9px] font-bold z-[7]`}>
+                               +{group.teachers.length - 3}
+                             </span>
+                          )}
+                        </div>
                       ) : <span className={sub}>O'qituvchi yo'q</span>}
                     </td>
                     {/* Talabalar */}
                     <td className="py-3 px-4">
-                      <span className={`font-semibold ${txt}`}>{group.max_student ?? '-'}</span>
+                      <span className={`font-semibold ${txt}`}>{group.studentCount ?? group.max_student ?? '-'}</span>
                     </td>
                     {/* Actions */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        {isArchiveView ? (
-                          <button
-                            onClick={() => handleRestore(group.id)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 px-2.5 py-1.5 text-[12px] font-bold text-indigo-600 hover:bg-indigo-50 transition-colors"
-                            title="Qaytarish"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a4 4 0 010 8H7m-4-8l4-4m-4 4l4 4"/>
-                            </svg>
-                            Qaytarish
-                          </button>
-                        ) : (
-                          <>
+                    {!isTeacher && (
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          {isArchiveView ? (
                             <button
-                              onClick={() => handleEditClick(group)}
-                              className="p-1 text-gray-300 hover:text-indigo-500 transition-colors"
-                              title="Tahrirlash"
+                              onClick={() => handleRestore(group.id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 px-2.5 py-1.5 text-[12px] font-bold text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              title="Qaytarish"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a4 4 0 010 8H7m-4-8l4-4m-4 4l4 4"/>
                               </svg>
+                              Qaytarish
                             </button>
-                            <button
-                              onClick={() => handleDelete(group.id)}
-                              className="p-1 text-gray-300 hover:text-red-500 transition-colors"
-                              title="Arxivga o'tkazish"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                              </svg>
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleEditClick(group)}
+                                className="p-1 text-gray-300 hover:text-indigo-500 transition-colors"
+                                title="Tahrirlash"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDelete(group.id)}
+                                className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                                title="Arxivga o'tkazish"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                   );
                 })
@@ -552,21 +573,31 @@ const Groups = ({ isDarkMode }) => {
               onClick={() => setShowTeacherModal(true)}
               className={`w-full px-4 py-2.5 rounded-xl border flex items-center justify-between text-[14px] transition-all hover:border-indigo-300 ${isDarkMode ? 'bg-[#0f172a] border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-700'}`}
             >
-              {form.teacher_id ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full overflow-hidden bg-indigo-50 border border-indigo-100">
-                    <img 
-                      src={teachers.find(t => t.id === +form.teacher_id)?.photo ? `http://localhost:3000/files/${teachers.find(t => t.id === +form.teacher_id).photo}` : `https://ui-avatars.com/api/?name=${teachers.find(t => t.id === +form.teacher_id)?.first_name}+${teachers.find(t => t.id === +form.teacher_id)?.last_name}&background=random&color=fff`} 
-                      className="w-full h-full object-cover" alt="" 
-                    />
-                  </div>
-                  <span className="font-semibold">{teachers.find(t => t.id === +form.teacher_id)?.first_name} {teachers.find(t => t.id === +form.teacher_id)?.last_name}</span>
-                </div>
-              ) : (
-                <span className="text-gray-400 font-medium">O'qituvchini tanlang</span>
-              )}
+              <div className="flex items-center gap-2">
+                 <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                   <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                 </div>
+                 <span className="font-semibold text-[13px]">
+                   {form.teacher_ids.length > 0 ? `${form.teacher_ids.length} ta o'qituvchi tanlandi` : "O'qituvchini tanlang"}
+                 </span>
+              </div>
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
+            {form.teacher_ids.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {form.teacher_ids.slice(0, 3).map(id => {
+                  const t = teachers.find(x => x.id === id);
+                  return t ? (
+                    <span key={id} className="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-[11px] rounded-lg border border-indigo-100 dark:border-indigo-800">
+                      {t.first_name} {t.last_name}
+                    </span>
+                  ) : null;
+                })}
+                {form.teacher_ids.length > 3 && (
+                  <span className="text-[11px] text-gray-400 self-center">+{form.teacher_ids.length - 3} yana</span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Room */}
@@ -649,30 +680,43 @@ const Groups = ({ isDarkMode }) => {
               </div>
             </div>
             <div className="max-h-[400px] overflow-y-auto p-2">
-              {teachers.filter(t => `${t.first_name} ${t.last_name}`.toLowerCase().includes(teacherSearch.toLowerCase())).map(t => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    setForm({...form, teacher_id: t.id});
-                    setShowTeacherModal(false);
-                  }}
-                  className={`w-full flex items-center gap-4 p-3 rounded-2xl transition-colors ${+form.teacher_id === t.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800' : 'hover:bg-gray-50 dark:hover:bg-[#334155]'}`}
-                >
-                  <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-100 border border-indigo-200">
-                    <img src={t.photo ? `http://localhost:3000/files/${t.photo}` : `https://ui-avatars.com/api/?name=${t.first_name}+${t.last_name}&background=random&color=fff`} className="w-full h-full object-cover" alt="" />
-                  </div>
-                  <div className="text-left">
-                    <p className={`font-bold text-sm ${txt}`}>{t.first_name} {t.last_name}</p>
-                    <p className="text-xs text-gray-500">{t.phone}</p>
-                  </div>
-                  {+form.teacher_id === t.id && (
-                    <div className="ml-auto w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-white">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+              {teachers.filter(t => `${t.first_name} ${t.last_name}`.toLowerCase().includes(teacherSearch.toLowerCase())).map(t => {
+                const isSelected = form.teacher_ids.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      setForm(f => ({
+                        ...f,
+                        teacher_ids: isSelected ? f.teacher_ids.filter(id => id !== t.id) : [...f.teacher_ids, t.id]
+                      }));
+                    }}
+                    className={`w-full flex items-center gap-4 p-3 rounded-2xl transition-colors ${isSelected ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800' : 'hover:bg-gray-50 dark:hover:bg-[#334155]'}`}
+                  >
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-100 border border-indigo-200">
+                      <img src={t.photo ? `http://localhost:3000/files/${t.photo}` : `https://ui-avatars.com/api/?name=${t.first_name}+${t.last_name}&background=random&color=fff`} className="w-full h-full object-cover" alt="" />
                     </div>
-                  )}
-                </button>
-              ))}
+                    <div className="text-left">
+                      <p className={`font-bold text-sm ${txt}`}>{t.first_name} {t.last_name}</p>
+                      <p className="text-xs text-gray-500">{t.phone}</p>
+                    </div>
+                    {isSelected && (
+                      <div className="ml-auto w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-white">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="p-4 border-t dark:border-gray-700 border-gray-100 flex justify-end">
+              <button 
+                onClick={() => setShowTeacherModal(false)}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
+              >
+                Tayyor
+              </button>
             </div>
           </div>
         </div>

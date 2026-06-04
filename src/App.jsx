@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import educationImg from './assets/education.png';
 import studySvg from './assets/study.svg';
 import Dashboard from './components/Dashboard';
+import TeacherDashboard from './components/TeacherDashboard';
 import { authService } from './services/auth.service';
 import { Toaster } from 'react-hot-toast';
 import {
@@ -387,6 +388,8 @@ function App() {
             !isAuth ? <Navigate to="/login" replace /> :
             (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN') ? 
             <Dashboard onLogout={handleLogout} userEmail={user?.email} /> :
+            (user?.role === 'TEACHER') ?
+            <TeacherDashboard onLogout={handleLogout} userEmail={user?.email} user={user} /> :
             <Restricted onLogout={handleLogout} user={user} />
           } />
 

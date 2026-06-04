@@ -159,8 +159,7 @@ const GroupDetails = ({ isDarkMode }) => {
     { id: 'lessons', label: 'Guruh darsliklari', icon: BookOpen },
     { id: 'homework', label: 'Uyga vazifa', icon: ClipboardList },
     { id: 'videos', label: 'Videolar', icon: Video },
-    { id: 'exams', label: 'Imtihonlar', icon: GraduationCap },
-    { id: 'journal', label: 'Jurnal', icon: ClipboardList }
+    { id: 'exams', label: 'Imtihonlar', icon: GraduationCap }
   ];
 
   const monthNames = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
@@ -337,25 +336,37 @@ const GroupDetails = ({ isDarkMode }) => {
       return;
     }
 
-    const lesson = lessonRows.find(item => item.id === +lessonForm.id);
-    if (!lesson) {
-      toast.error("Dars topilmadi");
-      return;
-    }
-
     setSavingLesson(true);
-    const toastId = toast.loading("Dars yangilanmoqda...");
+    const toastId = toast.loading(lessonForm.id ? "Dars yangilanmoqda..." : "Dars qo'shilmoqda...");
     try {
-      await lessonsService.updateLesson(lessonForm.id, {
-        topic: lessonForm.topic.trim(),
-        lesson_date: mergeDateInputWithLessonTime(lessonForm.lesson_date, lesson)
-      });
-      toast.success("Dars yangilandi!", { id: toastId });
+      if (lessonForm.id) {
+        // Update existing lesson
+        const lesson = lessonRows.find(item => item.id === +lessonForm.id);
+        if (!lesson) {
+          toast.error("Dars topilmadi");
+          return;
+        }
+        await lessonsService.updateLesson(lessonForm.id, {
+          topic: lessonForm.topic.trim(),
+          lesson_date: mergeDateInputWithLessonTime(lessonForm.lesson_date, lesson)
+        });
+        toast.success("Dars yangilandi!", { id: toastId });
+      } else {
+        // Create new lesson
+        const lessonPayload = {
+          group_id: +id,
+          topic: lessonForm.topic.trim(),
+          lesson_date: new Date(lessonForm.lesson_date).toISOString(),
+          description: ""
+        };
+        await lessonsService.createLesson(lessonPayload);
+        toast.success("Dars qo'shildi!", { id: toastId });
+      }
       setLessonModalOpen(false);
       await fetchLessons();
     } catch (err) {
       console.error(err);
-      toast.error(err.message || "Darsni yangilashda xatolik", { id: toastId });
+      toast.error(err.message || (lessonForm.id ? "Darsni yangilashda xatolik" : "Darsni qo'shishda xatolik"), { id: toastId });
     } finally {
       setSavingLesson(false);
     }
@@ -434,18 +445,24 @@ const GroupDetails = ({ isDarkMode }) => {
               </div>
               <div className="p-8">
                 <div className="flex flex-wrap gap-12 justify-start items-center">
-                  {/* Teacher */}
-                  <div className="flex flex-col items-center text-center max-w-[120px]">
-                    <div className="w-16 h-16 rounded-full overflow-hidden mb-4 border-2 border-emerald-500 p-0.5">
-                       <img 
-                        src={group.teachers?.photo ? `http://localhost:3000/files/${group.teachers.photo}` : `https://ui-avatars.com/api/?name=${group.teachers?.first_name}+${group.teachers?.last_name}&background=ccc&color=fff`} 
-                        alt="Teacher"
-                        className="w-full h-full object-cover rounded-full"
-                      />
-                    </div>
-                    <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Teacher</span>
-                    <h4 className="text-[14px] font-black leading-tight">{group.teachers?.first_name} {group.teachers?.last_name}</h4>
-                  </div>
+                  {/* Teachers */}
+                  {group.teachers && group.teachers.length > 0 ? (
+                    group.teachers.map(teacher => (
+                      <div key={teacher.id} className="flex flex-col items-center text-center max-w-[120px]">
+                        <div className="w-16 h-16 rounded-full overflow-hidden mb-4 border-2 border-emerald-500 p-0.5 mt-2">
+                           <img 
+                            src={teacher.photo ? `http://localhost:3000/files/${teacher.photo}` : `https://ui-avatars.com/api/?name=${teacher.first_name}+${teacher.last_name}&background=ccc&color=fff`} 
+                            alt="Teacher"
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        </div>
+                        <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Teacher</span>
+                        <h4 className="text-[14px] font-black leading-tight">{teacher.first_name} {teacher.last_name}</h4>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-gray-400 text-sm font-medium mt-4">O'qituvchi biriktirilmagan</div>
+                  )}
                   
                   {/* Assistants can be added here if they come from backend in the future */}
                 </div>
@@ -712,11 +729,14 @@ const GroupDetails = ({ isDarkMode }) => {
             {activeLessonTab !== 'videos' && activeLessonTab !== 'exams' && (
               <button
                 type="button"
-                onClick={openHomeworkModal}
+                onClick={activeLessonTab === 'lessons' ? () => {
+                  setLessonForm({ id: '', topic: '', lesson_date: formatDateInput(new Date().toISOString()) });
+                  setLessonModalOpen(true);
+                } : openHomeworkModal}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#10b981] px-5 py-2.5 text-[13px] font-black text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-[#059669]"
               >
                 <Plus className="h-4 w-4" />
-                Uyga vazifa qo'shish
+                {activeLessonTab === 'lessons' ? 'Dars qo\'shish' : 'Uyga vazifa qo\'shish'}
               </button>
             )}
           </div>
@@ -917,7 +937,7 @@ const GroupDetails = ({ isDarkMode }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className={`w-full max-w-lg rounded-2xl border shadow-2xl ${isDarkMode ? 'border-gray-800 bg-[#1e293b]' : 'border-gray-100 bg-white'}`}>
             <div className="flex items-center justify-between border-b p-5 dark:border-gray-800">
-              <h3 className="text-[18px] font-black">Darsni tahrirlash</h3>
+              <h3 className="text-[18px] font-black">{lessonForm.id ? 'Darsni tahrirlash' : 'Dars qo\'shish'}</h3>
               <button
                 type="button"
                 onClick={closeLessonModal}
@@ -962,7 +982,7 @@ const GroupDetails = ({ isDarkMode }) => {
                 disabled={savingLesson}
                 className="rounded-xl bg-[#6366f1] px-6 py-2.5 text-[13px] font-black text-white transition-colors hover:bg-[#4f46e5] disabled:opacity-50"
               >
-                {savingLesson ? 'Saqlanmoqda...' : 'Saqlash'}
+                {savingLesson ? 'Saqlanmoqda...' : (lessonForm.id ? 'Yangilash' : 'Qo\'shish')}
               </button>
             </div>
           </div>

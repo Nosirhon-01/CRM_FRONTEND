@@ -25,6 +25,21 @@ export const getGroups = async () => {
   }
 };
 
+export const getMyGroups = async () => {
+  try {
+    const response = await fetch(`${API_URL}/groups/my-groups`, {
+      method: 'GET',
+      headers: getHeaders()
+    });
+    if (!response.ok) throw new Error(`Error: ${response.status} ${response.statusText}`);
+    const json = await response.json();
+    return json.data || [];
+  } catch (error) {
+    console.error('Failed to fetch my groups:', error);
+    throw error;
+  }
+};
+
 export const createGroup = async (payload) => {
   try {
     const response = await fetch(`${API_URL}/groups`, {
@@ -143,6 +158,7 @@ export const getGroupById = async (id) => {
 
 export default {
   getGroups,
+  getMyGroups,
   getArchivedGroups,
   createGroup,
   deleteGroup,

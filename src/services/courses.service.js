@@ -48,6 +48,26 @@ export const createCourse = async (payload) => {
   }
 };
 
+export const updateCourse = async (id, payload) => {
+  try {
+    const response = await fetch(`${API_URL}/courses/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status} ${response.statusText}`);
+    }
+
+    const json = await response.json();
+    return json;
+  } catch (error) {
+    console.error('Failed to update course:', error);
+    throw error;
+  }
+};
+
 export const deleteCourse = async (id) => {
   try {
     const response = await fetch(`${API_URL}/courses/${id}`, {

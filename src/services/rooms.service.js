@@ -23,6 +23,17 @@ const roomsService = {
     }
   },
 
+  updateRoom: async (id, roomData) => {
+    try {
+      const response = await apiClient.patch(`/rooms/${id}`, roomData);
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Xonani tahrirlashda xato';
+      console.error('Error updating room:', message);
+      throw { message, status: error.response?.status };
+    }
+  },
+
   deleteRoom: async (id) => {
     try {
       const response = await apiClient.delete(`/rooms/${id}`);

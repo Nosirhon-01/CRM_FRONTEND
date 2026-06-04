@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getCourses, createCourse, deleteCourse } from '../services/courses.service';
+import { getCourses, createCourse, updateCourse, deleteCourse } from '../services/courses.service';
 
 const formatPrice = (value) => {
   const numericValue = Number(value);
@@ -51,6 +51,7 @@ export const Courses = ({ isDarkMode }) => {
   
   const [showAddSidebar, setShowAddSidebar] = useState(false);
   const [newCourse, setNewCourse] = useState({ name: '', description: '', price: '', duration_hours: 90, duration_month: 3, level: 'beginner' });
+  const [editingCourse, setEditingCourse] = useState(null);
 
   const fetchCourses = async () => {
     try {
@@ -79,23 +80,48 @@ export const Courses = ({ isDarkMode }) => {
     }
   };
 
+  const closeSidebar = () => {
+    setShowAddSidebar(false);
+    setEditingCourse(null);
+    setNewCourse({ name: '', description: '', price: '', duration_hours: 90, duration_month: 3, level: 'beginner' });
+  };
+
   const handleCreateCourse = async () => {
     if (!newCourse.name || !newCourse.price || !newCourse.level) return;
     try {
-      await createCourse({
+      const payload = {
         name: newCourse.name,
         description: newCourse.description,
         price: Number(newCourse.price),
         duration_hours: Number(newCourse.duration_hours),
         duration_month: Number(newCourse.duration_month),
         level: newCourse.level
-      });
+      };
+
+      if (editingCourse) {
+        await updateCourse(editingCourse.id, payload);
+      } else {
+        await createCourse(payload);
+      }
+
       await fetchCourses();
-      setShowAddSidebar(false);
-      setNewCourse({ name: '', description: '', price: '', duration_hours: 90, duration_month: 3, level: 'beginner' });
+      closeSidebar();
     } catch (err) {
-      console.error('Create error:', err);
+      console.error('Create/Update error:', err);
     }
+  };
+
+  const openEditSidebar = (course) => {
+    setEditingCourse(course);
+    setNewCourse({
+      name: course.name,
+      description: course.description || '',
+      price: course.price,
+      duration_hours: course.duration_hours,
+      duration_month: course.duration_month,
+      level: course.level || 'beginner'
+    });
+    setShowAddSidebar(true);
   };
 
   if (loading) return <div className="p-4">Yuklanmoqda...</div>;
@@ -137,7 +163,7 @@ export const Courses = ({ isDarkMode }) => {
               index={index}
               isDarkMode={isDarkMode}
               onDelete={() => handleDelete(course.id)}
-              onEdit={() => {}}
+              onEdit={() => openEditSidebar(course)}
             />
           ))}
         </div>
@@ -146,8 +172,8 @@ export const Courses = ({ isDarkMode }) => {
       {/* Add Course Sidebar */}
       <div className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] shadow-2xl transition-transform duration-300 ${showAddSidebar ? 'translate-x-0' : 'translate-x-full'} ${isDarkMode ? 'bg-[#1e293b]' : 'bg-white'}`}>
         <div className={`p-6 border-b flex items-center justify-between ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-          <h2 className={`text-[17px] font-bold ${isDarkMode ? 'text-white' : 'text-[#1e2a4a]'}`}>Kurs qo'shish</h2>
-          <button onClick={() => setShowAddSidebar(false)} className="p-2 text-gray-400 hover:text-gray-600">
+          <h2 className={`text-[17px] font-bold ${isDarkMode ? 'text-white' : 'text-[#1e2a4a]'}`}>{editingCourse ? 'Kursni tahrirlash' : 'Kurs qo\'shish'}</h2>
+          <button onClick={closeSidebar} className="p-2 text-gray-400 hover:text-gray-600">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
@@ -169,11 +195,11 @@ export const Courses = ({ isDarkMode }) => {
           </div>
         </div>
         <div className={`p-6 border-t absolute bottom-0 w-full flex justify-end space-x-3 bg-white dark:bg-[#1e293b] ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-          <button onClick={() => setShowAddSidebar(false)} className="px-5 py-2.5 text-gray-600 font-medium">Bekor qilish</button>
-          <button onClick={handleCreateCourse} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors">Qo'shish</button>
+          <button onClick={closeSidebar} className="px-5 py-2.5 text-gray-600 font-medium">Bekor qilish</button>
+          <button onClick={handleCreateCourse} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors">{editingCourse ? 'Saqlash' : 'Qo\'shish'}</button>
         </div>
       </div>
-      {showAddSidebar && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={() => setShowAddSidebar(false)} />}
+      {showAddSidebar && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={closeSidebar} />}
     </div>
   );
 };
