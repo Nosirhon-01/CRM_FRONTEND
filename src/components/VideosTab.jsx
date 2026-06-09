@@ -3,7 +3,7 @@ import { Download, Trash2, Eye, MoreVertical, Play, Plus, X } from 'lucide-react
 import { toast } from 'react-hot-toast';
 import { getGroupVideos, deleteVideo, createVideo, updateVideo, uploadVideoWithProgress } from '../services/videos.service';
 import { getGroupLessons } from '../services/lessons.service';
-import { BACKEND_BASE_URL } from '../config/api';
+import { getMediaUrl } from '../utils/media-url';
 
 const VideosTab = ({ groupId, isDarkMode }) => {
   const [videos, setVideos] = useState([]);
@@ -92,7 +92,7 @@ const VideosTab = ({ groupId, isDarkMode }) => {
       return;
     }
     const link = document.createElement('a');
-    link.href = videoUrl;
+    link.href = getMediaUrl(videoUrl, 'videos');
     link.download = videoName;
     document.body.appendChild(link);
     link.click();
@@ -644,7 +644,7 @@ const VideosTab = ({ groupId, isDarkMode }) => {
               <div className={`relative aspect-video max-h-[70vh] flex items-center justify-center ${isDarkMode ? 'bg-black' : 'bg-gray-100'}`}>
                  {selectedVideo.videoUrl ? (
                     <video 
-                      src={selectedVideo.videoUrl.startsWith('http') ? selectedVideo.videoUrl : `${BACKEND_BASE_URL}${selectedVideo.videoUrl}`}
+                      src={getMediaUrl(selectedVideo.videoUrl, 'videos')}
                       controls 
                       autoPlay
                       className="w-full h-full object-contain"

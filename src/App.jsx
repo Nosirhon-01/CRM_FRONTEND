@@ -4,6 +4,7 @@ import educationImg from './assets/education.png';
 import studySvg from './assets/study.svg';
 import Dashboard from './components/Dashboard';
 import TeacherDashboard from './components/TeacherDashboard';
+import StudentDashboard from './components/StudentDashboard';
 import { authService } from './services/auth.service';
 import { Toaster } from 'react-hot-toast';
 import {
@@ -195,12 +196,14 @@ function Login({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="example@gmail.com"
                 required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Email sx={{ color: '#7c4dff', mr: 0.5 }} />
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Email sx={{ color: '#7c4dff', mr: 0.5 }} />
+                      </InputAdornment>
+                    ),
+                  }
                 }}
               />
 
@@ -212,19 +215,21 @@ function Login({
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Parolni kiriting"
                 required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock sx={{ color: '#7c4dff' }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Lock sx={{ color: '#7c4dff' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }
                 }}
               />
 
@@ -390,6 +395,8 @@ function App() {
             <Dashboard onLogout={handleLogout} userEmail={user?.email} /> :
             (user?.role === 'TEACHER') ?
             <TeacherDashboard onLogout={handleLogout} userEmail={user?.email} user={user} /> :
+            (user?.role === 'STUDENT') ?
+            <StudentDashboard onLogout={handleLogout} userEmail={user?.email} user={user} /> :
             <Restricted onLogout={handleLogout} user={user} />
           } />
 
