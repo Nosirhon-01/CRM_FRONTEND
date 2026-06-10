@@ -177,7 +177,7 @@ const StudentLessonDetail = ({ isDarkMode }) => {
                        }}
                        className="px-4 py-2 bg-orange-500 text-white rounded disabled:opacity-50"
                      >
-                       {uploading ? 'Jo'natilyapti...' : 'Jo'natish'}
+                      {uploading ? "Jo'natilyapti..." : "Jo'natish"}
                      </button>
                      <button onClick={() => { setSubmissionTitle(''); setSubmissionFile(null); setError(''); }} className="px-3 py-2 border rounded">Bekor</button>
                    </div>
@@ -193,14 +193,29 @@ const StudentLessonDetail = ({ isDarkMode }) => {
                     <button className="px-6 py-4 border-b-2 border-orange-400 text-orange-500 font-bold text-[15px]">Vazifalar</button>
                 </div>
                 <div className="p-6 border-b border-gray-100">
-                   <div className="flex justify-between items-center mb-4">
-                     <h4 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>Uyga vazifa</h4>
-                     <div className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                        Uyga vazifa muddati: {formatDate(new Date(new Date(currentHomework.created_at).getTime() + 86400000), true)}
+                   <div className="flex items-center justify-between mb-4">
+                     <div className="flex-1">
+                       <h4 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>Uyga vazifa</h4>
+                     </div>
+
+                     <div className="flex-1 text-center">
+                       <div className="inline-block bg-yellow-50 text-yellow-800 text-sm font-medium px-4 py-2 rounded">
+                         <svg className="inline-block mr-2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                         Uyga vazifa muddati: {formatDate(new Date(new Date(currentHomework.created_at).getTime() + 86400000), true)}
+                       </div>
+                     </div>
+
+                     <div className="flex-1 text-right text-sm text-gray-600">
+                       Fayllar soni: {currentHomework.file ? 1 : 0}
                      </div>
                    </div>
-                   <p className={`mb-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{currentHomework.title || currentHomework.description}</p>
+
+                   <p className={`mb-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{currentHomework.title}</p>
+
+                   {currentHomework.description && (
+                     <p className={`mb-4 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{currentHomework.description}</p>
+                   )}
+
                    {currentHomework.file && (
                      <div className="mb-4 flex items-center gap-3">
                         <a
@@ -214,6 +229,7 @@ const StudentLessonDetail = ({ isDarkMode }) => {
                         <span className="text-xs text-gray-400">{currentHomework.file}</span>
                      </div>
                    )}
+
                    <p className="text-right text-xs text-gray-400 font-semibold">{formatDate(currentHomework.created_at, true)}</p>
                 </div>
                 {!myAnswer && (
@@ -230,7 +246,7 @@ const StudentLessonDetail = ({ isDarkMode }) => {
         </div>
 
         {/* RIGHT COMPONENT - Sidebar Topics */}
-        <div className={`w-full lg:w-80 flex-shrink-0 flex flex-col gap-3 rounded-xl p-4 shadow-sm border ${isDarkMode ? 'bg-[#1e293b] border-gray-700' : 'bg-white border-gray-100'}`}>
+        <div className={`w-full lg:w-80 shrink-0 flex flex-col gap-3 rounded-xl p-4 shadow-sm border ${isDarkMode ? 'bg-[#1e293b] border-gray-700' : 'bg-white border-gray-100'}`}>
            <h3 className={`font-bold mb-2 ml-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Mavzular</h3>
            <div className="overflow-y-auto max-h-[70vh] flex flex-col gap-3 pr-2 custom-scrollbar">
              {lessons.map((lesson) => {
